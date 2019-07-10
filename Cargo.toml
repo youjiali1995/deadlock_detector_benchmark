@@ -1,0 +1,18 @@
+[package]
+name = "deadlock_detector_benchmark"
+version = "0.1.0"
+authors = ["youjiali1995 <zlwgx1023@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.1"
+tokio-core = "0.1"
+tokio-timer = "0.2"
+kvproto = { git = "https://github.com/pingcap/kvproto.git", branch = "release-3.0" }
+quick-error = "1.2.2"
+grpcio = { version = "0.4", features = [ "secure" ] }
+log = { version = "0.4", features = ["std", "serde"] }
+structopt = { version = "0.2", default-features = false }
+rand = "0.7.0"
+env_logger = "0.6"
+chrono = "0.4"
