@@ -16,23 +16,28 @@ impl Generator {
         }
     }
 
-    pub fn generate(&mut self) -> DeadlockRequest {
-        let tp = match self.rng.gen_range(0, 3) {
-            0 => DeadlockRequestType::Detect,
-            1 => DeadlockRequestType::CleanUpWaitFor,
-            2 => DeadlockRequestType::CleanUp,
-            _ => unreachable!(),
-        };
+    /// Generates a detect request and a clean-up-wait-for request.
+    pub fn generate(&mut self) -> (DeadlockRequest, DeadlockRequest) {
+        let txn = self.rng.gen_range(0, self.range);
+        let mut wait_for_txn = txn;
+        while wait_for_txn == txn {
+            wait_for_txn = self.rng.gen_range(0, self.range);
+        }
+
         let mut entry = WaitForEntry::new();
-        entry.set_txn(self.rng.gen_range(0, self.range));
-        entry.set_wait_for_txn(self.rng.gen_range(0, self.range));
+        entry.set_txn(txn);
+        entry.set_wait_for_txn(wait_for_txn);
         entry.set_key_hash(self.rng.gen_range(0, self.range));
-        let mut req = DeadlockRequest::new();
-        req.set_tp(tp);
-        req.set_entry(entry);
-        req
+        let mut detect_req = DeadlockRequest::new();
+        detect_req.set_tp(DeadlockRequestType::Detect);
+        detect_req.set_entry(entry);
+
+        let mut clean_up_req = detect_req.clone();
+        clean_up_req.set_tp(DeadlockRequestType::CleanUpWaitFor);
+        (detect_req, clean_up_req)
     }
 
+    /// Generates two detect requests out of the range which cause deadlock.
     pub fn generate_deadlock_entries(&self) -> (DeadlockRequest, DeadlockRequest) {
         let mut entry = WaitForEntry::new();
         entry.set_txn(self.range);
@@ -55,7 +60,7 @@ impl Generator {
 }
 
 impl Stream for Generator {
-    type Item = DeadlockRequest;
+    type Item = (DeadlockRequest, DeadlockRequest);
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {

@@ -71,7 +71,7 @@ fn benchmark(opt: Arc<Opt>) {
     let entry = entry2.clone();
     let (send, recv) = client.register_detect_handler(Box::new(move |resp| {
         DEADLOCKS.fetch_add(1, Ordering::Relaxed);
-        // When recving the deadlock response, all the previous requests are handled.
+        // When recving the deadlock response corresponding to the last detect request, all the previous requests are handled.
         if resp.get_entry() == entry.get_entry() {
             debug!("send finished");
             REQUESTS.fetch_add(requests, Ordering::Relaxed);
@@ -82,8 +82,10 @@ fn benchmark(opt: Arc<Opt>) {
     }));
     handle.spawn(send.map_err(|e| error!("client failed: {:?}", e)));
 
-    for _ in 0..opt.requests {
-        client.detect(generator.generate()).unwrap();
+    for _ in 0..opt.requests / 2 {
+        let reqs = generator.generate();
+        client.detect(reqs.0).unwrap();
+        client.detect(reqs.1).unwrap();
     }
     client.detect(entry1).unwrap();
     client.detect(entry2).unwrap();
