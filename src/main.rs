@@ -117,10 +117,10 @@ fn main() {
     let elapsed = now.elapsed().as_millis();
     let requests = REQUESTS.load(Ordering::Relaxed);
     info!(
-        "{} requests finished in {}ms, deadlocks: {}, qps: {}",
+        "{} requests finished in {}ms, deadlocks: {}, qps: {:.2}",
         requests,
         elapsed,
         DEADLOCKS.load(Ordering::Relaxed),
-        requests / (elapsed as usize) * 1000
+        (requests as f64) / (elapsed as f64) * 1000f64
     );
 }
