@@ -4,53 +4,59 @@ use kvproto::deadlock::*;
 use rand::prelude::*;
 
 pub struct Generator {
-    range: u64,
     rng: ThreadRng,
+    range: u64,
+    timestamp: u64,
 }
 
 impl Generator {
     pub fn new(range: u64) -> Self {
         Self {
-            range,
             rng: ThreadRng::default(),
+            range,
+            timestamp: 0,
         }
     }
 
-    /// Generates a detect request and a clean-up-wait-for request.
-    pub fn generate(&mut self) -> (DeadlockRequest, DeadlockRequest) {
-        let txn = self.rng.gen_range(0, self.range);
-        let mut wait_for_txn = txn;
-        while wait_for_txn == txn {
-            wait_for_txn = self.rng.gen_range(0, self.range);
-        }
-
+    /// Generates a detect request
+    pub fn generate(&mut self) -> DeadlockRequest {
         let mut entry = WaitForEntry::new();
-        entry.set_txn(txn);
-        entry.set_wait_for_txn(wait_for_txn);
-        entry.set_key_hash(self.rng.gen_range(0, self.range));
-        let mut detect_req = DeadlockRequest::new();
-        detect_req.set_tp(DeadlockRequestType::Detect);
-        detect_req.set_entry(entry);
+        entry.set_txn(self.timestamp);
 
-        let mut clean_up_req = detect_req.clone();
-        clean_up_req.set_tp(DeadlockRequestType::CleanUpWaitFor);
-        (detect_req, clean_up_req)
+        let mut wait_for_txn = self.timestamp;
+        while wait_for_txn == self.timestamp {
+            wait_for_txn = self.rng.gen_range(
+                if self.timestamp < self.range {
+                    0
+                } else {
+                    self.timestamp - self.range
+                },
+                self.timestamp + self.range,
+            );
+        }
+        entry.set_wait_for_txn(wait_for_txn);
+        entry.set_key_hash(self.rng.gen());
+        let mut req = DeadlockRequest::new();
+        req.set_tp(DeadlockRequestType::Detect);
+        req.set_entry(entry);
+        self.timestamp += 1;
+        req
     }
 
-    /// Generates two detect requests out of the range which cause deadlock.
+    /// Generates two detect requests with maximum timestamp.
     pub fn generate_deadlock_entries(&self) -> (DeadlockRequest, DeadlockRequest) {
         let mut entry = WaitForEntry::new();
-        entry.set_txn(self.range);
-        entry.set_wait_for_txn(self.range + 1);
-        entry.set_key_hash(self.range);
+        entry.set_txn(u64::max_value() - 1);
+        entry.set_wait_for_txn(u64::max_value());
+        entry.set_key_hash(0);
         let mut req1 = DeadlockRequest::new();
         req1.set_tp(DeadlockRequestType::Detect);
         req1.set_entry(entry);
 
         let mut entry = WaitForEntry::new();
-        entry.set_txn(self.range + 1);
-        entry.set_wait_for_txn(self.range);
-        entry.set_key_hash(self.range + 1);
+        entry.set_txn(u64::max_value());
+        entry.set_wait_for_txn(u64::max_value() - 1);
+        entry.set_key_hash(0);
         let mut req2 = DeadlockRequest::new();
         req2.set_tp(DeadlockRequestType::Detect);
         req2.set_entry(entry);
@@ -60,7 +66,7 @@ impl Generator {
 }
 
 impl Stream for Generator {
-    type Item = (DeadlockRequest, DeadlockRequest);
+    type Item = DeadlockRequest;
     type Error = Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
