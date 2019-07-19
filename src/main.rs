@@ -114,6 +114,10 @@ fn start_benchmark_workers(opt: Arc<Opt>) -> Vec<JoinHandle<()>> {
 }
 
 fn clean_up(opt: Arc<Opt>) {
+    if opt.delay == 0 {
+        return;
+    }
+
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
